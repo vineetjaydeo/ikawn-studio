@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset=utf-8><title>iKawn Studio: talking-head reels, bring your own key</title><meta name=viewport content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0a0a0e;--p:#14141b;--l:#25252f;--t:#ececf3;--m:#8b8ba1;--a:#b6ff3b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:14px/1.45 Inter,system-ui,sans-serif;min-height:100vh;display:grid;grid-template-columns:400px 1fr}
+aside{background:var(--p);border-right:1px solid var(--l);padding:22px;overflow:auto}h1{font-size:18px;margin:0}h1 span{color:var(--a)}.tag{color:var(--m);font-size:12px;margin:2px 0 14px}
+h3{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--m);margin:16px 0 6px}
+textarea,select,input{width:100%;background:#0e0e14;color:var(--t);border:1px solid var(--l);border-radius:10px;padding:10px;font:inherit}textarea{height:110px;resize:vertical}
+.row{display:flex;gap:8px}.row>*{flex:1}button{width:100%;border:0;border-radius:10px;padding:12px;font-weight:700;cursor:pointer;margin-top:10px;background:var(--a);color:#0a0a0e}button.g{background:transparent;color:var(--t);border:1px solid var(--l)}
+.cost{border:1px dashed var(--l);border-radius:10px;padding:10px;margin-top:12px;font-size:13px}.cost b{color:var(--a)}small{color:var(--m)}
+main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px}.phone{height:78vh;aspect-ratio:9/16;background:#000;border:1px solid var(--l);border-radius:24px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--m)}video{width:100%;height:100%;object-fit:cover}#st{color:var(--m);font-size:13px}
+</style></head><body>
+<aside>
+<h1>iKawn <span>Studio</span></h1><div class=tag>Talking-head reels · open source · bring your own key</div>
+<h3>0 · Your Runware key</h3><input id=key type=password placeholder="Runware API key (kept in this browser only)" autocomplete=off><small id=keyhint>Get one at runware.ai. Sent only with your own requests; never stored on the server.</small>
+<h3>1 · Your face</h3><input type=file id=base accept="image/*,video/*"><small>Photo → talking head · Video → lip-sync onto your own footage</small>
+<h3>2 · Script</h3><textarea id=script>Most founders waste hours editing videos. With iKawn Studio, you write a script and get a reel in minutes.</textarea>
+<div class=row><select id=lang></select><select id=model></select></div>
+<h3>3 · Voice</h3><select id=voice><option value=7e48c8d406b04a8089c5eb3cd057cb2e>Jonah, clear & professional</option><option value=d322a996ccc54505a170d5f9db7fd7dd>Kieran, warm</option><option value=41f17b4ebd334ac99a91c2aada5f86d7>Cecily, warm</option><option value=6ab7f456be114a109f8c8006567f638c>Felicity, upbeat</option></select>
+<small>or clone your voice (30–180 s sample):</small><input type=file id=sample accept="audio/*"><input id=vid placeholder="saved voice id (optional)" style="margin-top:6px">
+<div class=cost id=est>Estimate: type a script</div>
+<button onclick=make('480p')>Generate 480p preview</button>
+<div class=row><button class=g onclick=make('720p')>Final HD 720p</button><button class=g onclick=make('1080p')>Final FHD 1080p</button></div>
+<div class=row><label><input type=radio name=mode value=regenerate checked style=width:auto> regenerate</label><label><input type=radio name=mode value=upscale style=width:auto> upscale preview</label></div>
+<h3>Max spend per video (USD)</h3><input id=max type=number step=0.05 min=0 value=0.50>
+<div class=cost id=act>Actual spend: $0.0000</div>
+</aside>
+<main><div class=phone id=pv>9:16 preview</div><div id=st></div></main>
+<script>
+const $=i=>document.getElementById(i);let spent=0,last=null,M={};
+$('key').value=localStorage.getItem('rwkey')||'';$('key').onchange=()=>localStorage.setItem('rwkey',$('key').value.trim());
+fetch('/api/models').then(r=>r.json()).then(d=>{M=d;$('max').value=d.max_spend_usd??0.5;if(d.byok_only)$('keyhint').textContent='Required on this host. Kept in this browser only; never stored on the server.';$('lang').innerHTML=Object.entries(d.languages).map(([k,v])=>`<option value=${k}>${v}</option>`).join('');fillModels();est()});
+function fillModels(){const v=($('base').files[0]||{}).type?.startsWith('video');const m=v?M.video:M.image;$('model').innerHTML=Object.entries(m).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}
+$('base').onchange=()=>{fillModels();est()};$('model').onchange=est;let t;$('script').oninput=()=>{clearTimeout(t);t=setTimeout(est,400)};
+async function est(){const f=new FormData();f.append('script',$('script').value);f.append('model',$('model').value||'heygen:avatar@4');const d=await (await fetch('/api/estimate',{method:'POST',body:f})).json();
+ const r=t=>`regenerate $${d.final[t].regenerate.toFixed(3)} · upscale $${d.final[t].upscale_preview.toFixed(3)} <small>(best: ${d.final[t].recommended.replace('_',' ')})</small>`;
+ $('est').innerHTML=`~${d.seconds}s video<br>Preview 480p: <b>$${d.preview_480p.toFixed(3)}</b><br>HD 720p: ${r('720p')}<br>FHD 1080p: ${r('1080p')}`}
+async function make(tier){if(!$('base').files[0])return alert('Add a photo or video');if(!$('script').value.trim())return alert('Write a script');$('st').textContent='Generating '+tier+'… (1–4 min, keep this tab open)';
+ const f=new FormData();f.append('script',$('script').value);f.append('base',$('base').files[0]);f.append('model',$('model').value);f.append('language',$('lang').value);f.append('voice',$('voice').value);f.append('tier',tier);
+ if($('sample').files[0])f.append('voice_sample',$('sample').files[0]);if($('vid').value)f.append('voice_id',$('vid').value);
+ const mode=document.querySelector('input[name=mode]:checked').value;f.append('mode',mode);if(last)f.append('preview_remote',last);f.append('max_spend',$('max').value||'0.5');
+ const h=$('key').value.trim()?{'X-Runware-Key':$('key').value.trim()}:{};let d;
+ try{const r=await fetch('/api/make',{method:'POST',body:f,headers:h});d=await r.json()}catch(e){$('st').textContent='Network error: '+e;return}
+ if(d.error){$('st').textContent=(d.detail||d.error)+(d.cost?` (spent $${d.cost})`:'');if(d.cost){spent+=d.cost;$('act').innerHTML=`session: $${spent.toFixed(4)}`}return}
+ if(tier=='480p')last=d.remote;if(d.voice_id)$('vid').value=d.voice_id;spent+=d.cost;$('act').innerHTML=`Last video: <b>$${d.cost.toFixed(4)}</b> · session: $${spent.toFixed(4)}`;
+ $('pv').innerHTML=`<video src="${d.url}" controls autoplay playsinline></video>`;$('st').innerHTML=`${tier} · ${d.seconds.toFixed(1)}s · captions: ${d.captions} · <a style="color:var(--a)" href="${d.url}" download>download MP4</a>`}
+</script></body></html>

@@ -1,0 +1,18 @@
+# Render.com Blueprint (free web service; sleeps after 15 min idle, 512 MB RAM -> set IKAWN_CAPTIONS=proportional).
+services:
+  - type: web
+    name: ikawn-studio
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: IKAWN_BYOK_ONLY
+        value: "1"
+      - key: IKAWN_MAX_SPEND
+        value: "0.50"
+      - key: IKAWN_CAPTIONS
+        value: proportional
+      - key: PORT
+        value: "8000"
